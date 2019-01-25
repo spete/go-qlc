@@ -156,10 +156,11 @@ func processReceiveBlock(seeds []*SeedData) {
 				if receSeed != nil {
 					balance, _ := mock.RawToBalance(b.Balance, "QLC")
 					fmt.Printf("receive block from [%s] to[%s] amount[%d]\n", b.Address.String(), receSeed.address, balance)
-					err := receiveblock(b, receSeed.address, receSeed.privateKey)
-					if err != nil {
-						fmt.Printf("err[%s] when generate receive block.\n", err)
-					}
+					//TODO: fix
+					//err :=  receiveblock(b, receSeed.address, receSeed.privateKey)
+					//if err != nil {
+					//	fmt.Printf("err[%s] when generate receive block.\n", err)
+					//}
 				}
 			}
 		}
