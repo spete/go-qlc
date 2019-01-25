@@ -77,7 +77,10 @@ func getPerformanceTime() error {
 		fmt.Println(err)
 	}
 
-	var tmp Int64Slice
+	var consensus []int64
+	var start []int64
+	var end []int64
+	var fullConsensus []int64
 
 	loc, _ := time.LoadLocation("Asia/Shanghai")
 	err = l.PerformanceTimes(func(p *types.PerformanceTime) {
@@ -87,44 +90,105 @@ func getPerformanceTime() error {
 		} else {
 			t0 := time.Unix(0, p.T0)
 			t1 := time.Unix(0, p.T1)
+			start = append(start, p.T0)
+			end = append(end, p.T1)
+			fullConsensus = append(fullConsensus, p.T1-p.T0)
 			d1 := t1.Sub(t0)
 			t2 := time.Unix(0, p.T2)
 			t3 := time.Unix(0, p.T3)
 			d2 := t3.Sub(t2)
-			tmp = append(tmp, d2.Nanoseconds())
+			consensus = append(consensus, d2.Nanoseconds())
 			s := fmt.Sprintf("receive block[\"%s\"] @ %s, 1st consensus cost %s, full consensus cost %s\n", p.Hash.String(), time.Unix(0, p.T0).In(loc).Format("2006-01-02 15:04:05.000000"), d2, d1)
 			_, _ = fd1.WriteString(s)
 		}
 	})
 
-	sort.Sort(tmp)
+	sort.Slice(consensus, func(i, j int) bool {
+		return consensus[i] < consensus[j]
+	})
+	sort.Slice(start, func(i, j int) bool {
+		return start[i] < start[j]
+	})
+	sort.Slice(end, func(i, j int) bool {
+		return end[i] < end[j]
+	})
+	sort.Slice(fullConsensus, func(i, j int) bool {
+		return fullConsensus[i] < fullConsensus[j]
+	})
 
-	tmp2 := tmp[100 : len(tmp)-100]
+	//fmt.Println("performance time size: ", len(consensus))
 
-	sum := int64(0)
+	i := average(consensus)
+	duration, _ := time.ParseDuration(fmt.Sprintf("%dns", i))
+	max := int64(float64(i) * 1.1)
+	maxDuration, _ := time.ParseDuration(fmt.Sprintf("%dns", max))
 
-	for _, v := range tmp2 {
-		sum += v
+	consensus2 := filter(consensus, func(i int64) bool {
+		return i < max
+	})
+
+	avFullConsensus := average(fullConsensus)
+	minFullConsensus := fullConsensus[0]
+	maxFullConsensus := fullConsensus[len(fullConsensus)-1]
+	d1, _ := time.ParseDuration(fmt.Sprintf("%dns", avFullConsensus))
+	d2, _ := time.ParseDuration(fmt.Sprintf("%dns", maxFullConsensus))
+	d3, _ := time.ParseDuration(fmt.Sprintf("%dns", minFullConsensus))
+	fmt.Printf("full consensus cost time => max: %s, min: %s, average: %s\n", d2, d3, d1)
+
+	av := average(consensus2)
+
+	t := fmt.Sprintf("%dns", av)
+	duration2, _ := time.ParseDuration(t)
+
+	fmt.Printf("average consensus[%d]: %s, filter average consensus(by max %s)[%d]: %s, capacity %f\n", len(consensus), duration, maxDuration, len(consensus2),
+		duration2, float64(1000000000)/float64(duration.Nanoseconds()))
+
+	//fmt.Println("===> start ", start)
+	//fmt.Println("===> end ", end)
+
+	start0 := time.Unix(0, start[0])
+	start1 := time.Unix(0, start[len(end)-1])
+
+	startDuration := start1.Sub(start0)
+
+	fmt.Printf("transfer %d Tx from %s to %s cost %s\n", len(start), start0.In(loc).Format("2006-01-02 15:04:05.000000"),
+		start1.In(loc).Format("2006-01-02 15:04:05.000000"), startDuration)
+
+	end0 := time.Unix(0, end[0])
+	end1 := time.Unix(0, end[len(end)-1])
+
+	fmt.Printf("consensus %d Tx from %s to %s cost %s\n", len(start), end0.In(loc).Format("2006-01-02 15:04:05.000000"),
+		end1.In(loc).Format("2006-01-02 15:04:05.000000"), end1.Sub(end0))
+
+	d := end1.Sub(start0)
+	i2 := float64(0)
+	if d.Seconds() > 0 {
+		i2 = d.Seconds() / float64(len(start))
+	} else {
+		i2 = 0
 	}
 
-	t := fmt.Sprintf("%dns", sum/int64(len(tmp2)))
-	duration, _ := time.ParseDuration(t)
-	fmt.Println("avenge consensus", duration)
-
-	if err != nil {
-		fmt.Println(err)
-	}
+	fmt.Printf("all %d Tx from %s to %s cost %s, one Tx cost %f second(s) \n", len(start), start0.In(loc).Format("2006-01-02 15:04:05.000000"), end1.In(loc).Format("2006-01-02 15:04:05.000000"), d, i2)
 	return nil
 }
 
-type Int64Slice []int64
+func average(slice []int64) int64 {
+	sum := int64(0)
 
-func (c Int64Slice) Len() int {
-	return len(c)
+	for _, v := range slice {
+		sum += v
+	}
+
+	return sum / int64(len(slice))
 }
-func (c Int64Slice) Swap(i, j int) {
-	c[i], c[j] = c[j], c[i]
-}
-func (c Int64Slice) Less(i, j int) bool {
-	return c[i] < c[j]
+
+func filter(slice []int64, fn func(int64) bool) []int64 {
+	b := slice[:0]
+	for _, x := range slice {
+		if fn(x) {
+			b = append(b, x)
+		}
+	}
+
+	return b
 }
