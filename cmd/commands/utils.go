@@ -4,17 +4,16 @@ import (
 	"fmt"
 	"github.com/qlcchain/go-qlc/common/util"
 	"reflect"
+	"sync"
 
 	"github.com/qlcchain/go-qlc/chain"
 	"github.com/qlcchain/go-qlc/common"
 	"github.com/qlcchain/go-qlc/common/types"
 	"github.com/qlcchain/go-qlc/config"
 	"github.com/qlcchain/go-qlc/consensus"
-	"github.com/qlcchain/go-qlc/crypto/ed25519"
 	"github.com/qlcchain/go-qlc/ledger"
 	"github.com/qlcchain/go-qlc/log"
 	"github.com/qlcchain/go-qlc/p2p"
-	"github.com/qlcchain/go-qlc/p2p/protos"
 	"github.com/qlcchain/go-qlc/rpc"
 	"github.com/qlcchain/go-qlc/test/mock"
 	"github.com/qlcchain/go-qlc/wallet"
@@ -66,27 +65,40 @@ func initNode(account types.Address, password string, cfg *config.Config) error 
 	ctx.RPC = rpc.NewRPCService(cfg, ctx.DPosService)
 
 	if !account.IsZero() {
-		_ = ctx.NetService.MessageEvent().GetEvent("consensus").Subscribe(p2p.EventConfirmedBlock, func(v interface{}) {
+		s := ctx.Wallet.Wallet.NewSession(account)
 
-			if b, ok := v.(*types.StateBlock); ok {
-				if b.Address.ToHash() != b.Link {
-					s := ctx.Wallet.Wallet.NewSession(account)
-					if isValid, err := s.VerifyPassword(password); isValid && err == nil {
-						if a, err := s.GetRawKey(types.Address(b.Link)); err == nil {
-							addr := a.Address()
-							if addr.ToHash() == b.Link {
-								balance, _ := mock.RawToBalance(b.Balance, "QLC")
-								fmt.Printf("receive block from [%s] to[%s] amount[%d]\n", b.Address.String(), addr.String(), balance)
-								err = receive(b, s, addr)
-								if err != nil {
-									fmt.Printf("err[%s] when generate receive block.\n", err)
-								}
-							}
+		var cache sync.Map
+
+		if isValid, err := s.VerifyPassword(password); isValid && err == nil {
+			_ = ctx.NetService.MessageEvent().GetEvent("consensus").Subscribe(p2p.EventConfirmedBlock, func(v interface{}) {
+
+				if b, ok := v.(*types.StateBlock); ok {
+					address := types.Address(b.Link)
+					// genesis block
+					if b.Address.ToHash() == b.Link {
+						return
+					}
+
+					if _, ok := cache.Load(address); !ok {
+						if account, err := s.GetRawKey(address); err == nil {
+							cache.Store(address, account)
 						}
 					}
+
+					if account, ok := cache.Load(address); ok {
+						balance, _ := mock.RawToBalance(b.Balance, "QLC")
+						fmt.Printf("receive block from [%s] to[%s] amount[%d]\n", b.Address.String(), address.String(), balance)
+						err = receive(b, account.(*types.Account))
+						if err != nil {
+							fmt.Printf("err[%s] when generate receive block.\n", err)
+						}
+
+					}
 				}
-			}
-		})
+			})
+		} else {
+			fmt.Println("invalid password")
+		}
 	}
 
 	services = []common.Service{ctx.NetService, ctx.DPosService, ctx.Ledger, ctx.Wallet, ctx.RPC}
@@ -110,74 +122,24 @@ func startNode() ([]common.Service, error) {
 	return services, nil
 }
 
-func receive(sendBlock types.Block, session *wallet.Session, address types.Address) error {
+func receive(sendBlock types.Block, account *types.Account) error {
 	l := ctx.Ledger.Ledger
-	n := ctx.NetService
 
-	receiveBlock, err := session.GenerateReceiveBlock(sendBlock)
+	receiveBlock, err := l.GenerateReceiveBlock(sendBlock, account.PrivateKey())
 	if err != nil {
 		return err
 	}
 	fmt.Println(util.ToString(&receiveBlock))
-	if r, err := l.Process(receiveBlock); err != nil || r == ledger.Other {
-		fmt.Println(util.ToString(&receiveBlock))
-		fmt.Println("process block error", err)
-		return err
-	} else {
-		fmt.Println("receive block, ", receiveBlock.GetHash())
 
-		meta, err := l.GetAccountMeta(address)
-		if err != nil {
-			fmt.Println(err)
-			return err
-		}
-		fmt.Println(util.ToString(&meta))
-		pushBlock := protos.PublishBlock{
-			Blk: receiveBlock,
-		}
-		bytes, err := protos.PublishBlockToProto(&pushBlock)
-		if err != nil {
-			fmt.Println(err)
-			return err
-		} else {
-			n.Broadcast(p2p.PublishReq, bytes)
-		}
-	}
-	return nil
-}
+	client, err := ctx.RPC.RPC().Attach()
+	defer client.Close()
 
-func receiveblock(sendBlock types.Block, address types.Address, prk ed25519.PrivateKey) error {
-	l := ctx.Ledger.Ledger
-	n := ctx.NetService
-
-	receiveBlock, err := l.GenerateReceiveBlock(sendBlock, prk)
+	var h types.Hash
+	err = client.Call(&h, "ledger_process", &receiveBlock)
 	if err != nil {
-		return err
-	}
-	fmt.Println(util.ToString(&receiveBlock))
-	if r, err := l.Process(receiveBlock); err != nil || r == ledger.Other {
 		fmt.Println(util.ToString(&receiveBlock))
 		fmt.Println("process block error", err)
-		return err
-	} else {
-		fmt.Println("receive block, ", receiveBlock.GetHash())
-
-		meta, err := l.GetAccountMeta(address)
-		if err != nil {
-			fmt.Println(err)
-			return err
-		}
-		fmt.Println(util.ToString(&meta))
-		pushBlock := protos.PublishBlock{
-			Blk: receiveBlock,
-		}
-		bytes, err := protos.PublishBlockToProto(&pushBlock)
-		if err != nil {
-			fmt.Println(err)
-			return err
-		} else {
-			n.Broadcast(p2p.PublishReq, bytes)
-		}
 	}
+
 	return nil
 }
