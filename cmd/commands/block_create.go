@@ -3,6 +3,7 @@ package commands
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/qlcchain/go-qlc/common/util"
 	"io/ioutil"
 	"math/big"
 	"os"
@@ -151,16 +152,27 @@ func processReceiveBlock(seeds []*SeedData) {
 	_ = ctx.NetService.MessageEvent().GetEvent("consensus").Subscribe(p2p.EventConfirmedBlock, func(v interface{}) {
 		if b, ok := v.(*types.StateBlock); ok {
 			if b.Address.ToHash() != b.Link {
+				client, err := ctx.RPC.RPC().Attach()
+				if err != nil {
+					return
+				}
+				defer client.Close()
+
 				receAddr := types.Address(b.Link)
 				receSeed := findAccount(seeds, receAddr)
 				if receSeed != nil {
 					balance, _ := mock.RawToBalance(b.Balance, "QLC")
 					fmt.Printf("receive block from [%s] to[%s] amount[%d]\n", b.Address.String(), receSeed.address, balance)
-					//TODO: fix
-					//err :=  receiveblock(b, receSeed.address, receSeed.privateKey)
-					//if err != nil {
-					//	fmt.Printf("err[%s] when generate receive block.\n", err)
-					//}
+					if block, err := ctx.Ledger.Ledger.GenerateReceiveBlock(b, receSeed.privateKey); err == nil {
+						var h types.Hash
+						err = client.Call(&h, "ledger_process", &block)
+						if err != nil {
+							fmt.Println(util.ToString(&block))
+							fmt.Println("process block error", err)
+						} else {
+							fmt.Println("process ", h.String(), "successful")
+						}
+					}
 				}
 			}
 		}
