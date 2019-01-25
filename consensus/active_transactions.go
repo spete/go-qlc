@@ -4,8 +4,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/qlcchain/go-qlc/p2p"
-
 	"github.com/qlcchain/go-qlc/p2p/protos"
 
 	"github.com/qlcchain/go-qlc/common/types"
@@ -98,6 +96,9 @@ func (act *ActiveTrx) announceVotes() {
 					T3:   p.T3,
 				}
 				act.dps.ledger.AddOrUpdatePerformance(t)
+				if err != nil {
+					act.dps.logger.Info("AddOrUpdatePerformance error T2")
+				}
 			} else {
 				act.dps.logger.Info("get performanceTime error T2")
 			}
@@ -111,12 +112,15 @@ func (act *ActiveTrx) announceVotes() {
 					T2:   p.T2,
 					T3:   p.T3,
 				}
-				act.dps.ledger.AddOrUpdatePerformance(t)
+				err := act.dps.ledger.AddOrUpdatePerformance(t)
+				if err != nil {
+					act.dps.logger.Info("AddOrUpdatePerformance error T1")
+				}
 			} else {
 				act.dps.logger.Info("get performanceTime error T1")
 			}
 			act.dps.logger.Info("this block is already confirmed")
-			act.dps.ns.MessageEvent().GetEvent("consensus").Notify(p2p.EventConfirmedBlock, value.(*Election).status.winner)
+			//act.dps.ns.MessageEvent().GetEvent("consensus").Notify(p2p.EventConfirmedBlock, value.(*Election).status.winner)
 			act.inactive = append(act.inactive, value.(*Election).vote.id)
 		} else {
 			act.dps.priInfos.Range(func(k, v interface{}) bool {
@@ -154,6 +158,9 @@ func (act *ActiveTrx) announceVotes() {
 						T3:   time.Now().UnixNano(),
 					}
 					act.dps.ledger.AddOrUpdatePerformance(t)
+					if err != nil {
+						act.dps.logger.Info("AddOrUpdatePerformance error T3")
+					}
 				} else {
 					act.dps.logger.Info("get performanceTime error T3")
 				}

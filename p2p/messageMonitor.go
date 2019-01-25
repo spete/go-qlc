@@ -108,16 +108,18 @@ func (ms *MessageService) onPublishReq(message Message) error {
 		return err
 	}
 	if exit, err := ms.ledger.IsPerformanceTimeExist(blk.Blk.GetHash()); !exit && err == nil {
-		t := &types.PerformanceTime{
-			Hash: blk.Blk.GetHash(),
-			T0:   time.Now().UnixNano(),
-			T1:   0,
-			T2:   0,
-			T3:   0,
-		}
-		err = ms.ledger.AddOrUpdatePerformance(t)
-		if err != nil {
-			ms.netService.node.logger.Error("error when run IsPerformanceTimeExist in onPublishReq func")
+		if b, err := ms.ledger.HasStateBlock(blk.Blk.GetHash()); !b && err == nil {
+			t := &types.PerformanceTime{
+				Hash: blk.Blk.GetHash(),
+				T0:   time.Now().UnixNano(),
+				T1:   0,
+				T2:   0,
+				T3:   0,
+			}
+			err = ms.ledger.AddOrUpdatePerformance(t)
+			if err != nil {
+				ms.netService.node.logger.Error("error when run AddOrUpdatePerformance in onPublishReq func")
+			}
 		}
 	}
 	ms.netService.msgEvent.GetEvent("consensus").Notify(EventPublish, blk.Blk)
@@ -130,16 +132,18 @@ func (ms *MessageService) onConfirmReq(message Message) error {
 		return err
 	}
 	if exit, err := ms.ledger.IsPerformanceTimeExist(blk.Blk.GetHash()); !exit && err == nil {
-		t := &types.PerformanceTime{
-			Hash: blk.Blk.GetHash(),
-			T0:   time.Now().UnixNano(),
-			T1:   0,
-			T2:   0,
-			T3:   0,
-		}
-		err = ms.ledger.AddOrUpdatePerformance(t)
-		if err != nil {
-			ms.netService.node.logger.Error("error when run IsPerformanceTimeExist in onPublishReq func")
+		if b, err := ms.ledger.HasStateBlock(blk.Blk.GetHash()); !b && err == nil {
+			t := &types.PerformanceTime{
+				Hash: blk.Blk.GetHash(),
+				T0:   time.Now().UnixNano(),
+				T1:   0,
+				T2:   0,
+				T3:   0,
+			}
+			err = ms.ledger.AddOrUpdatePerformance(t)
+			if err != nil {
+				ms.netService.node.logger.Error("error when run AddOrUpdatePerformance in onConfirmReq func")
+			}
 		}
 	}
 	ms.netService.msgEvent.GetEvent("consensus").Notify(EventConfirmReq, blk.Blk)
@@ -152,16 +156,18 @@ func (ms *MessageService) onConfirmAck(message Message) error {
 		return err
 	}
 	if exit, err := ms.ledger.IsPerformanceTimeExist(ack.Blk.GetHash()); !exit && err == nil {
-		t := &types.PerformanceTime{
-			Hash: ack.Blk.GetHash(),
-			T0:   time.Now().UnixNano(),
-			T1:   0,
-			T2:   0,
-			T3:   0,
-		}
-		err = ms.ledger.AddOrUpdatePerformance(t)
-		if err != nil {
-			ms.netService.node.logger.Error("error when run IsPerformanceTimeExist in onPublishReq func")
+		if b, err := ms.ledger.HasStateBlock(ack.Blk.GetHash()); !b && err == nil {
+			t := &types.PerformanceTime{
+				Hash: ack.Blk.GetHash(),
+				T0:   time.Now().UnixNano(),
+				T1:   0,
+				T2:   0,
+				T3:   0,
+			}
+			err = ms.ledger.AddOrUpdatePerformance(t)
+			if err != nil {
+				ms.netService.node.logger.Error("error when run AddOrUpdatePerformance in onConfirmAck func")
+			}
 		}
 	}
 	ms.netService.msgEvent.GetEvent("consensus").Notify(EventConfirmAck, ack)
@@ -176,16 +182,18 @@ func (ms *MessageService) onBulkPullRsp(message Message) error {
 
 	block := blkPacket.Blk
 	if exit, err := ms.ledger.IsPerformanceTimeExist(block.GetHash()); !exit && err == nil {
-		t := &types.PerformanceTime{
-			Hash: block.GetHash(),
-			T0:   time.Now().UnixNano(),
-			T1:   0,
-			T2:   0,
-			T3:   0,
-		}
-		err = ms.ledger.AddOrUpdatePerformance(t)
-		if err != nil {
-			ms.netService.node.logger.Error("error when run IsPerformanceTimeExist in onPublishReq func")
+		if b, err := ms.ledger.HasStateBlock(block.GetHash()); !b && err == nil {
+			t := &types.PerformanceTime{
+				Hash: block.GetHash(),
+				T0:   time.Now().UnixNano(),
+				T1:   0,
+				T2:   0,
+				T3:   0,
+			}
+			err = ms.ledger.AddOrUpdatePerformance(t)
+			if err != nil {
+				ms.netService.node.logger.Error("error when run AddOrUpdatePerformance in onBulkPullRsp func")
+			}
 		}
 	}
 	ms.netService.msgEvent.GetEvent("consensus").Notify(EventSyncBlock, block)
@@ -199,16 +207,18 @@ func (ms *MessageService) onBulkPushBlock(message Message) error {
 	}
 	block := blkPacket.Blk
 	if exit, err := ms.ledger.IsPerformanceTimeExist(block.GetHash()); !exit && err == nil {
-		t := &types.PerformanceTime{
-			Hash: block.GetHash(),
-			T0:   time.Now().UnixNano(),
-			T1:   0,
-			T2:   0,
-			T3:   0,
-		}
-		err = ms.ledger.AddOrUpdatePerformance(t)
-		if err != nil {
-			ms.netService.node.logger.Error("error when run IsPerformanceTimeExist in onPublishReq func")
+		if b, err := ms.ledger.HasStateBlock(block.GetHash()); !b && err == nil {
+			t := &types.PerformanceTime{
+				Hash: block.GetHash(),
+				T0:   time.Now().UnixNano(),
+				T1:   0,
+				T2:   0,
+				T3:   0,
+			}
+			err = ms.ledger.AddOrUpdatePerformance(t)
+			if err != nil {
+				ms.netService.node.logger.Error("error when run AddOrUpdatePerformance in onBulkPushBlock func")
+			}
 		}
 	}
 	ms.netService.msgEvent.GetEvent("consensus").Notify(EventSyncBlock, block)
