@@ -3,6 +3,8 @@ package p2p
 import (
 	"time"
 
+	"github.com/qlcchain/go-qlc/common/types"
+
 	"github.com/qlcchain/go-qlc/ledger"
 	"github.com/qlcchain/go-qlc/p2p/protos"
 )
@@ -55,6 +57,7 @@ func (ms *MessageService) Start() {
 	go ms.startLoop()
 	go ms.syncService.Start()
 }
+
 func (ms *MessageService) startLoop() {
 	ms.netService.node.logger.Info("Started Message Service.")
 
@@ -85,10 +88,10 @@ func (ms *MessageService) startLoop() {
 				ms.syncService.onBulkPullRequest(message)
 			case BulkPullRsp:
 				ms.netService.node.logger.Info("receive BulkPullRsp")
-				ms.syncService.onBulkPullRsp(message)
+				ms.onBulkPullRsp(message)
 			case BulkPushBlock:
 				ms.netService.node.logger.Info("receive BulkPushBlock")
-				ms.syncService.onBulkPushBlock(message)
+				ms.onBulkPushBlock(message)
 			default:
 				ms.netService.node.logger.Error("Received unknown message.")
 				time.Sleep(100 * time.Millisecond)
@@ -98,30 +101,121 @@ func (ms *MessageService) startLoop() {
 		}
 	}
 }
+
 func (ms *MessageService) onPublishReq(message Message) error {
 	blk, err := protos.PublishBlockFromProto(message.Data())
 	if err != nil {
 		return err
 	}
+	if exit, err := ms.ledger.IsPerformanceTimeExist(blk.Blk.GetHash()); !exit && err == nil {
+		t := &types.PerformanceTime{
+			Hash: blk.Blk.GetHash(),
+			T0:   time.Now().UnixNano(),
+			T1:   0,
+			T2:   0,
+			T3:   0,
+		}
+		err = ms.ledger.AddOrUpdatePerformance(t)
+		if err != nil {
+			ms.netService.node.logger.Error("error when run IsPerformanceTimeExist in onPublishReq func")
+		}
+	}
 	ms.netService.msgEvent.GetEvent("consensus").Notify(EventPublish, blk.Blk)
 	return nil
 }
+
 func (ms *MessageService) onConfirmReq(message Message) error {
 	blk, err := protos.ConfirmReqBlockFromProto(message.Data())
 	if err != nil {
 		return err
 	}
+	if exit, err := ms.ledger.IsPerformanceTimeExist(blk.Blk.GetHash()); !exit && err == nil {
+		t := &types.PerformanceTime{
+			Hash: blk.Blk.GetHash(),
+			T0:   time.Now().UnixNano(),
+			T1:   0,
+			T2:   0,
+			T3:   0,
+		}
+		err = ms.ledger.AddOrUpdatePerformance(t)
+		if err != nil {
+			ms.netService.node.logger.Error("error when run IsPerformanceTimeExist in onPublishReq func")
+		}
+	}
 	ms.netService.msgEvent.GetEvent("consensus").Notify(EventConfirmReq, blk.Blk)
 	return nil
 }
+
 func (ms *MessageService) onConfirmAck(message Message) error {
 	ack, err := protos.ConfirmAckBlockFromProto(message.Data())
 	if err != nil {
 		return err
 	}
+	if exit, err := ms.ledger.IsPerformanceTimeExist(ack.Blk.GetHash()); !exit && err == nil {
+		t := &types.PerformanceTime{
+			Hash: ack.Blk.GetHash(),
+			T0:   time.Now().UnixNano(),
+			T1:   0,
+			T2:   0,
+			T3:   0,
+		}
+		err = ms.ledger.AddOrUpdatePerformance(t)
+		if err != nil {
+			ms.netService.node.logger.Error("error when run IsPerformanceTimeExist in onPublishReq func")
+		}
+	}
 	ms.netService.msgEvent.GetEvent("consensus").Notify(EventConfirmAck, ack)
 	return nil
 }
+
+func (ms *MessageService) onBulkPullRsp(message Message) error {
+	blkPacket, err := protos.BulkPushBlockFromProto(message.Data())
+	if err != nil {
+		return err
+	}
+
+	block := blkPacket.Blk
+	if exit, err := ms.ledger.IsPerformanceTimeExist(block.GetHash()); !exit && err == nil {
+		t := &types.PerformanceTime{
+			Hash: block.GetHash(),
+			T0:   time.Now().UnixNano(),
+			T1:   0,
+			T2:   0,
+			T3:   0,
+		}
+		err = ms.ledger.AddOrUpdatePerformance(t)
+		if err != nil {
+			ms.netService.node.logger.Error("error when run IsPerformanceTimeExist in onPublishReq func")
+		}
+	}
+	ms.netService.msgEvent.GetEvent("consensus").Notify(EventSyncBlock, block)
+	return nil
+}
+
+func (ms *MessageService) onBulkPushBlock(message Message) error {
+	blkPacket, err := protos.BulkPushBlockFromProto(message.Data())
+	if err != nil {
+		return err
+	}
+	block := blkPacket.Blk
+	if exit, err := ms.ledger.IsPerformanceTimeExist(block.GetHash()); !exit && err == nil {
+		t := &types.PerformanceTime{
+			Hash: block.GetHash(),
+			T0:   time.Now().UnixNano(),
+			T1:   0,
+			T2:   0,
+			T3:   0,
+		}
+		err = ms.ledger.AddOrUpdatePerformance(t)
+		if err != nil {
+			ms.netService.node.logger.Error("error when run IsPerformanceTimeExist in onPublishReq func")
+		}
+	}
+	ms.netService.msgEvent.GetEvent("consensus").Notify(EventSyncBlock, block)
+
+	return nil
+}
+
 func (ms *MessageService) Stop() {
 	ms.netService.node.logger.Info("stopped message monitor")
 	// quit.

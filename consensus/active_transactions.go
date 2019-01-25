@@ -88,7 +88,33 @@ func (act *ActiveTrx) addToRoots(block types.Block) bool {
 func (act *ActiveTrx) announceVotes() {
 	var count = 0
 	act.roots.Range(func(key, value interface{}) bool {
+		if value.(*Election).announcements == 0 {
+			if p, err := act.dps.ledger.GetPerformanceTime(value.(*Election).status.winner.GetHash()); p != nil && err == nil {
+				t := &types.PerformanceTime{
+					Hash: value.(*Election).status.winner.GetHash(),
+					T0:   p.T0,
+					T1:   p.T1,
+					T2:   time.Now().UnixNano(),
+					T3:   p.T3,
+				}
+				act.dps.ledger.AddOrUpdatePerformance(t)
+			} else {
+				act.dps.logger.Info("get performanceTime error T2")
+			}
+		}
 		if value.(*Election).confirmed && value.(*Election).announcements >= announcementmin-1 {
+			if p, err := act.dps.ledger.GetPerformanceTime(value.(*Election).status.winner.GetHash()); p != nil && err == nil {
+				t := &types.PerformanceTime{
+					Hash: value.(*Election).status.winner.GetHash(),
+					T0:   p.T0,
+					T1:   time.Now().UnixNano(),
+					T2:   p.T2,
+					T3:   p.T3,
+				}
+				act.dps.ledger.AddOrUpdatePerformance(t)
+			} else {
+				act.dps.logger.Info("get performanceTime error T1")
+			}
 			act.dps.logger.Info("this block is already confirmed")
 			act.dps.ns.MessageEvent().GetEvent("consensus").Notify(p2p.EventConfirmedBlock, value.(*Election).status.winner)
 			act.inactive = append(act.inactive, value.(*Election).vote.id)
@@ -117,6 +143,20 @@ func (act *ActiveTrx) announceVotes() {
 			if count == 0 {
 				act.dps.logger.Info("this is just a node,not a wallet")
 				act.dps.sendConfirmReq(value.(*Election).status.winner)
+			}
+			if value.(*Election).announcements == 0 {
+				if p, err := act.dps.ledger.GetPerformanceTime(value.(*Election).status.winner.GetHash()); p != nil && err == nil {
+					t := &types.PerformanceTime{
+						Hash: value.(*Election).status.winner.GetHash(),
+						T0:   p.T0,
+						T1:   p.T1,
+						T2:   p.T2,
+						T3:   time.Now().UnixNano(),
+					}
+					act.dps.ledger.AddOrUpdatePerformance(t)
+				} else {
+					act.dps.logger.Info("get performanceTime error T3")
+				}
 			}
 			value.(*Election).announcements++
 		}

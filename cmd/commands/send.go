@@ -8,23 +8,30 @@
 package commands
 
 import (
+	"bufio"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/qlcchain/go-qlc/common/util"
+	"io"
+	"os"
+	"path/filepath"
 
 	"github.com/qlcchain/go-qlc/common/types"
+	"github.com/qlcchain/go-qlc/common/util"
 	"github.com/qlcchain/go-qlc/config"
+	"github.com/qlcchain/go-qlc/p2p"
+	"github.com/qlcchain/go-qlc/p2p/protos"
 	"github.com/qlcchain/go-qlc/test/mock"
-
 	"github.com/spf13/cobra"
 	cmn "github.com/tendermint/tmlibs/common"
 )
 
 var (
-	from   string
-	to     string
-	token  string
-	amount string
+	from          string
+	to            string
+	token         string
+	amount        string
+	blockFilePath string
 )
 
 // sendCmd represents the send command
@@ -44,6 +51,7 @@ func init() {
 	sendCmd.Flags().StringVarP(&to, "to", "t", "", "receive account")
 	sendCmd.Flags().StringVarP(&token, "token", "k", mock.GetChainTokenType().String(), "token hash for send action")
 	sendCmd.Flags().StringVarP(&amount, "amount", "m", "", "send amount")
+	sendCmd.Flags().StringVar(&blockFilePath, "blockFilePath", "", "Block storage path")
 	rootCmd.AddCommand(sendCmd)
 
 	// Here you will define your flags and configuration settings.
@@ -58,48 +66,84 @@ func init() {
 }
 
 func sendAction() error {
-	if from == "" || to == "" || amount == "" {
-		fmt.Println("err transfer info")
-		return errors.New("err transfer info")
-	}
-	source, err := types.HexToAddress(from)
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
-	t, err := types.HexToAddress(to)
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
-	tk, err := types.NewHash(token)
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
+	if blockFilePath == "" {
+		if from == "" || to == "" || amount == "" {
+			fmt.Println("err transfer info")
+			return errors.New("err transfer info")
+		}
+		source, err := types.HexToAddress(from)
+		if err != nil {
+			fmt.Println(err)
+			return err
+		}
+		t, err := types.HexToAddress(to)
+		if err != nil {
+			fmt.Println(err)
+			return err
+		}
+		tk, err := types.NewHash(token)
+		if err != nil {
+			fmt.Println(err)
+			return err
+		}
 
-	am := types.StringToBalance(amount)
-	if cfgPath == "" {
-		cfgPath = config.DefaultDataDir()
+		am := types.StringToBalance(amount)
+		if cfgPath == "" {
+			cfgPath = config.DefaultDataDir()
+		}
+		cm := config.NewCfgManager(cfgPath)
+		cfg, err := cm.Load()
+		if err != nil {
+			return err
+		}
+		err = initNode(source, pwd, cfg)
+		if err != nil {
+			fmt.Println(err)
+			return err
+		}
+		services, err = startNode()
+		if err != nil {
+			fmt.Println(err)
+		}
+		send(source, t, tk, am, pwd)
+		cmn.TrapSignal(func() {
+			stopNode(services)
+		})
+	} else {
+		if cfgPath == "" {
+			cfgPath = config.DefaultDataDir()
+		}
+		cm := config.NewCfgManager(cfgPath)
+		cfg, err := cm.Load()
+		if err != nil {
+			return err
+		}
+		err = initNode(types.ZeroAddress, "", cfg)
+		if err != nil {
+			fmt.Println(err)
+			return err
+		}
+		services, err = startNode()
+		if err != nil {
+			fmt.Println(err)
+		}
+		stateBlks := readBlockFile()
+		blks := stateBlockToBlock(stateBlks)
+		for _, v := range blks {
+			pushBlock := protos.PublishBlock{
+				Blk: v,
+			}
+			bytes, err := protos.PublishBlockToProto(&pushBlock)
+			if err != nil {
+				fmt.Println(err)
+			} else {
+				ctx.NetService.Broadcast(p2p.PublishReq, bytes)
+			}
+		}
+		cmn.TrapSignal(func() {
+			stopNode(services)
+		})
 	}
-	cm := config.NewCfgManager(cfgPath)
-	cfg, err := cm.Load()
-	if err != nil {
-		return err
-	}
-	err = initNode(source, pwd, cfg)
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
-	services, err = startNode()
-	if err != nil {
-		fmt.Println(err)
-	}
-	send(source, t, tk, am, pwd)
-	cmn.TrapSignal(func() {
-		stopNode(services)
-	})
 	return nil
 }
 
@@ -127,4 +171,37 @@ func send(from, to types.Address, token types.Hash, amount types.Balance, passwo
 	} else {
 		fmt.Println("invalid password ", err, " valid: ", b)
 	}
+}
+
+func readBlockFile() []types.StateBlock {
+	var blks []types.StateBlock
+	var blk types.StateBlock
+	fi, err := os.Open(filepath.Join(blockFilePath, "block.json"))
+	if err != nil {
+		fmt.Printf("Error open: %s\n", err)
+	}
+	defer fi.Close()
+
+	br := bufio.NewReader(fi)
+	for {
+		a, _, c := br.ReadLine()
+		if c == io.EOF {
+			break
+		}
+		if err = json.Unmarshal(a, &blk); err != nil {
+			fmt.Println(err)
+			continue
+		}
+		blks = append(blks, blk)
+	}
+	return blks
+}
+
+func stateBlockToBlock(blks []types.StateBlock) []types.Block {
+	size := len(blks)
+	b := make([]types.Block, size)
+	for i := 0; i < size; i++ {
+		b[i] = &blks[i]
+	}
+	return b
 }

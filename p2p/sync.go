@@ -41,6 +41,7 @@ func NewSyncService(netService *QlcService, ledger *ledger.Ledger) *ServiceSync 
 	}
 	return ss
 }
+
 func (ss *ServiceSync) Start() {
 	ss.logger.Info("started sync loop")
 	address := types.Address{}
@@ -85,6 +86,7 @@ func (ss *ServiceSync) Stop() {
 
 	ss.quitCh <- true
 }
+
 func (ss *ServiceSync) onFrontierReq(message Message) error {
 	var fs []*types.Frontier
 	fs, err := ss.qlcLedger.GetFrontiers()
@@ -112,6 +114,7 @@ func (ss *ServiceSync) onFrontierReq(message Message) error {
 	ss.netService.SendMessageToPeer(FrontierRsp, bytes, message.MessageFrom())
 	return nil
 }
+
 func (ss *ServiceSync) onFrontierRsp(message Message) error {
 	fsremote, err := messagepb.FrontierResponseFromProto(message.Data())
 	if err != nil {
@@ -270,6 +273,7 @@ func getLocalFrontier(ledger *ledger.Ledger) ([]*types.Frontier, error) {
 	frontiers = append(frontiers, fsback)
 	return frontiers, nil
 }
+
 func (ss *ServiceSync) onBulkPullRequest(message Message) error {
 	pullremote, err := messagepb.BulkPullReqPacketFromProto(message.Data())
 	if err != nil {
@@ -331,90 +335,92 @@ func (ss *ServiceSync) onBulkPullRequest(message Message) error {
 	}
 	return nil
 }
-func (ss *ServiceSync) onBulkPullRsp(message Message) error {
-	blkpacket, err := messagepb.BulkPushBlockFromProto(message.Data())
-	if err != nil {
-		return err
-	}
 
-	block := blkpacket.Blk
-	ss.netService.msgEvent.GetEvent("consensus").Notify(EventSyncBlock, block)
-	/*	err = ss.qlcLedger.AddBlock(block)
-		if err != nil {
-			return err
-		}
-		previousHash := block.GetPrevious()
-		if previousHash.IsZero() == false {
-			currentfr, err := ss.qlcLedger.GetFrontier(block.GetPrevious())
-			if err != nil {
-				return err
-			}
-			updatefr := &types.Frontier{
-				HeaderBlock: block.GetHash(),
-				OpenBlock:   currentfr.OpenBlock,
-			}
-			err = ss.qlcLedger.DeleteFrontier(block.GetPrevious())
-			if err != nil {
-				return err
-			}
-			err = ss.qlcLedger.AddFrontier(updatefr)
-			if err != nil {
-				return err
-			}
-		} else {
-			fr := &types.Frontier{
-				HeaderBlock: block.GetHash(),
-				OpenBlock:   block.GetHash(),
-			}
-			err = ss.qlcLedger.AddFrontier(fr)
-			if err != nil {
-				return err
-			}
-		}*/
-	return nil
-}
-func (ss *ServiceSync) onBulkPushBlock(message Message) error {
-	blkpacket, err := messagepb.BulkPushBlockFromProto(message.Data())
-	if err != nil {
-		return err
-	}
-	block := blkpacket.Blk
-	ss.netService.msgEvent.GetEvent("consensus").Notify(EventSyncBlock, block)
+//func (ss *ServiceSync) onBulkPullRsp(message Message) error {
+//	blkpacket, err := messagepb.BulkPushBlockFromProto(message.Data())
+//	if err != nil {
+//		return err
+//	}
+//
+//	block := blkpacket.Blk
+//	ss.netService.msgEvent.GetEvent("consensus").Notify(EventSyncBlock, block)
+//	/*	err = ss.qlcLedger.AddBlock(block)
+//		if err != nil {
+//			return err
+//		}
+//		previousHash := block.GetPrevious()
+//		if previousHash.IsZero() == false {
+//			currentfr, err := ss.qlcLedger.GetFrontier(block.GetPrevious())
+//			if err != nil {
+//				return err
+//			}
+//			updatefr := &types.Frontier{
+//				HeaderBlock: block.GetHash(),
+//				OpenBlock:   currentfr.OpenBlock,
+//			}
+//			err = ss.qlcLedger.DeleteFrontier(block.GetPrevious())
+//			if err != nil {
+//				return err
+//			}
+//			err = ss.qlcLedger.AddFrontier(updatefr)
+//			if err != nil {
+//				return err
+//			}
+//		} else {
+//			fr := &types.Frontier{
+//				HeaderBlock: block.GetHash(),
+//				OpenBlock:   block.GetHash(),
+//			}
+//			err = ss.qlcLedger.AddFrontier(fr)
+//			if err != nil {
+//				return err
+//			}
+//		}*/
+//	return nil
+//}
 
-	/*	err = ss.qlcLedger.AddBlock(block)
-		if err != nil {
-			return err
-		}
-		previousHash := block.GetPrevious()
-		if previousHash.IsZero() == false {
-			currentfr, err := ss.qlcLedger.GetFrontier(block.GetPrevious())
-			if err != nil {
-				return err
-			}
-			updatefr := &types.Frontier{
-				HeaderBlock: block.GetHash(),
-				OpenBlock:   currentfr.OpenBlock,
-			}
-			err = ss.qlcLedger.DeleteFrontier(block.GetPrevious())
-			if err != nil {
-				return err
-			}
-			err = ss.qlcLedger.AddFrontier(updatefr)
-			if err != nil {
-				return err
-			}
-		} else {
-			fr := &types.Frontier{
-				HeaderBlock: block.GetHash(),
-				OpenBlock:   block.GetHash(),
-			}
-			err = ss.qlcLedger.AddFrontier(fr)
-			if err != nil {
-				return err
-			}
-		}*/
-	return nil
-}
+//func (ss *ServiceSync) onBulkPushBlock(message Message) error {
+//	blkpacket, err := messagepb.BulkPushBlockFromProto(message.Data())
+//	if err != nil {
+//		return err
+//	}
+//	block := blkpacket.Blk
+//	ss.netService.msgEvent.GetEvent("consensus").Notify(EventSyncBlock, block)
+//
+//	/*	err = ss.qlcLedger.AddBlock(block)
+//		if err != nil {
+//			return err
+//		}
+//		previousHash := block.GetPrevious()
+//		if previousHash.IsZero() == false {
+//			currentfr, err := ss.qlcLedger.GetFrontier(block.GetPrevious())
+//			if err != nil {
+//				return err
+//			}
+//			updatefr := &types.Frontier{
+//				HeaderBlock: block.GetHash(),
+//				OpenBlock:   currentfr.OpenBlock,
+//			}
+//			err = ss.qlcLedger.DeleteFrontier(block.GetPrevious())
+//			if err != nil {
+//				return err
+//			}
+//			err = ss.qlcLedger.AddFrontier(updatefr)
+//			if err != nil {
+//				return err
+//			}
+//		} else {
+//			fr := &types.Frontier{
+//				HeaderBlock: block.GetHash(),
+//				OpenBlock:   block.GetHash(),
+//			}
+//			err = ss.qlcLedger.AddFrontier(fr)
+//			if err != nil {
+//				return err
+//			}
+//		}*/
+//	return nil
+//}
 
 func (ss *ServiceSync) next() {
 	if len(ss.frontiers) > 0 {
