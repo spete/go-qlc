@@ -146,11 +146,25 @@ func TestBalance_IsZero(t *testing.T) {
 func TestBalance_Sub(t *testing.T) {
 	bb1 := Balance{big.NewInt(10000)}
 	bb2 := Balance{big.NewInt(12000)}
-	t.Log("bb1-bb2: ", bb1.Sub(bb2))
+	bb3 := Balance{big.NewInt(-2000)}
+	bb4 := bb1.Sub(bb2)
+	t.Logf("bb1(%d) - bb2(%d) = %d", bb1, bb2, bb4)
+	if bb4.Compare(bb3) != BalanceCompEqual {
+		t.Fatal("error sub", bb1, bb2, bb4, bb3)
+	}
 }
 
 func TestBalance_Add(t *testing.T) {
 	bb1 := Balance{big.NewInt(10000)}
 	bb2 := Balance{big.NewInt(12000)}
-	t.Log("bb1+bb2: ", bb1.Add(bb2))
+	bb3 := Balance{big.NewInt(22000)}
+	bb4 := bb1.Add(bb2)
+	t.Logf("bb1(%d) + bb2(%d) = %d", bb1, bb2, bb4)
+	if bb4.Compare(bb3) != BalanceCompEqual {
+		t.Fatal("error add")
+	}
+
+	if !reflect.DeepEqual(bb4, bb3) {
+		t.Fatal(bb4, " ", bb3)
+	}
 }
