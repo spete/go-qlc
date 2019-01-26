@@ -120,11 +120,13 @@ func getPerformanceTime() error {
 
 	i := average(consensus)
 	duration, _ := time.ParseDuration(fmt.Sprintf("%dns", i))
-	max := int64(float64(i) * 1.1)
+	max := int64(float64(i) * 1.05)
+	min := int64(float64(i) * 0.95)
 	maxDuration, _ := time.ParseDuration(fmt.Sprintf("%dns", max))
+	minDuration, _ := time.ParseDuration(fmt.Sprintf("%dns", min))
 
 	consensus2 := filter(consensus, func(i int64) bool {
-		return i < max
+		return i <= max || i >= min
 	})
 
 	avFullConsensus := average(fullConsensus)
@@ -140,7 +142,7 @@ func getPerformanceTime() error {
 	t := fmt.Sprintf("%dns", av)
 	duration2, _ := time.ParseDuration(t)
 
-	fmt.Printf("average consensus[%d]: %s, filter average consensus(by max %s)[%d]: %s, capacity %f\n", len(consensus), duration, maxDuration, len(consensus2),
+	fmt.Printf("average consensus[%d]: %s, filter average by [%s %s] consensus[%d]: %s, capacity %f\n", len(consensus), duration, minDuration, maxDuration, len(consensus2),
 		duration2, float64(1000000000)/float64(duration.Nanoseconds()))
 
 	//fmt.Println("===> start ", start)
