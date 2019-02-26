@@ -113,6 +113,7 @@ func (sm *StreamManager) FindByPeerID(peerID string) *Stream {
 func (sm *StreamManager) Find(pid peer.ID) *Stream {
 	return sm.FindByPeerID(pid.Pretty())
 }
+
 func (sm *StreamManager) RandomPeer() (string, error) {
 	allPeers := make(PeersSlice, 0)
 
@@ -137,6 +138,7 @@ func (sm *StreamManager) RandomPeer() (string, error) {
 	}
 	return peerID, nil
 }
+
 func (sm *StreamManager) loop() {
 	ticker := time.NewTicker(FindPeerInterval)
 	sm.findPeers()
@@ -193,12 +195,28 @@ func (sm *StreamManager) CreateStreamWithPeer(pid peer.ID) {
 func (sm *StreamManager) BroadcastMessage(messageName string, v interface{}) {
 	sm.allStreams.Range(func(key, value interface{}) bool {
 		stream := value.(*Stream)
-		messageContent, err := MarshalMessage(messageName, v)
+		messageContent, err := marshalMessage(messageName, v)
 		if err != nil {
 			sm.node.logger.Errorf("receive [%s] when MarshalMessage", err)
 			return true
 		}
+		sm.node.logger.Debug("messageContent.......:", messageContent)
 		stream.SendMessage(messageName, messageContent)
+		return true
+	})
+}
+
+func (sm *StreamManager) SendMessageToPeers(messageName string, v interface{}, peerID string) {
+	sm.allStreams.Range(func(key, value interface{}) bool {
+		stream := value.(*Stream)
+		if stream.pid.Pretty() != peerID {
+			messageContent, err := marshalMessage(messageName, v)
+			if err != nil {
+				sm.node.logger.Errorf("receive [%s] when MarshalMessage", err)
+				return true
+			}
+			stream.SendMessage(messageName, messageContent)
+		}
 		return true
 	})
 }

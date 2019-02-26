@@ -4,31 +4,33 @@ import (
 	"github.com/qlcchain/go-qlc/common/types"
 	"github.com/qlcchain/go-qlc/p2p"
 	"github.com/qlcchain/go-qlc/p2p/protos"
+	"github.com/qlcchain/go-qlc/test/mock"
 )
 
 type electionStatus struct {
 	winner types.Block
 	tally  types.Balance
+	loser  []types.Hash
 }
 
 type Election struct {
-	vote          *Votes
-	status        electionStatus
-	confirmed     bool
-	dps           *DposService
-	announcements uint
+	vote      *Votes
+	status    electionStatus
+	confirmed bool
+	dps       *DposService
+	//announcements uint
 }
 
 func NewElection(dps *DposService, block types.Block) (*Election, error) {
 	vt := NewVotes(block)
-	status := electionStatus{block, types.ZeroBalance}
+	status := electionStatus{block, types.ZeroBalance, nil}
 
 	return &Election{
-		vote:          vt,
-		status:        status,
-		confirmed:     false,
-		dps:           dps,
-		announcements: 0,
+		vote:      vt,
+		status:    status,
+		confirmed: false,
+		dps:       dps,
+		//announcements: 0,
 	}, nil
 }
 
@@ -39,7 +41,7 @@ func (el *Election) voteAction(va *protos.ConfirmAckBlock) {
 	}
 	var shouldProcess bool
 	exit, vt := el.vote.voteExit(va.Account)
-	if exit == true {
+	if exit {
 		if vt.Sequence < va.Sequence {
 			shouldProcess = true
 		} else {
@@ -72,7 +74,11 @@ func (el *Election) haveQuorum() {
 	if err != nil {
 		el.dps.logger.Infof("err:[%s] when get block", err)
 	}
-	supply := el.getOnlineRepresentativesBalance()
+	//supply := el.getOnlineRepresentativesBalance()
+	supply, err := el.getGenesisBalance()
+	if err != nil {
+		return
+	}
 	b, err := supply.Div(2)
 	if err != nil {
 		return
@@ -82,6 +88,11 @@ func (el *Election) haveQuorum() {
 		el.status.winner = blk
 		el.confirmed = true
 		el.status.tally = balance
+		for key, _ := range t {
+			if key.String() != hash.String() {
+				el.status.loser = append(el.status.loser, key)
+			}
+		}
 	} else {
 		el.dps.logger.Infof("wait for enough rep vote,current vote is [%s]", balance.String())
 	}
@@ -111,4 +122,13 @@ func (el *Election) getOnlineRepresentativesBalance() types.Balance {
 		}
 	}
 	return b
+}
+
+func (el *Election) getGenesisBalance() (types.Balance, error) {
+	hash := mock.GetChainTokenType()
+	i, err := mock.GetTokenById(hash)
+	if err != nil {
+		return types.ZeroBalance, err
+	}
+	return i.TotalSupply, nil
 }
